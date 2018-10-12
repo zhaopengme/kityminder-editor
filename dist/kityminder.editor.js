@@ -1,6 +1,6 @@
 /*!
  * ====================================================
- * kityminder-editor - v1.0.63 - 2018-03-27
+ * kityminder-editor - v1.0.64 - 2018-10-12
  * https://github.com/fex-team/kityminder-editor
  * GitHub: https://github.com/fex-team/kityminder-editor 
  * Copyright (c) 2018 ; Licensed 
@@ -40,6 +40,11 @@ var _p = {
 //src/editor.js
 _p[0] = {
     value: function(require, exports, module) {
+        _p.r(7);
+        _p.r(5);
+        _p.r(12);
+        _p.r(6);
+        _p.r(8);
         /**
      * 运行时
      */
@@ -56,20 +61,20 @@ _p[0] = {
             }
         }
         KMEditor.assemble = assemble;
-        assemble(_p.r(7));
-        assemble(_p.r(9));
-        assemble(_p.r(14));
-        assemble(_p.r(18));
-        assemble(_p.r(11));
-        assemble(_p.r(12));
-        assemble(_p.r(5));
-        assemble(_p.r(6));
-        assemble(_p.r(8));
         assemble(_p.r(15));
-        assemble(_p.r(10));
-        assemble(_p.r(13));
-        assemble(_p.r(16));
         assemble(_p.r(17));
+        assemble(_p.r(22));
+        assemble(_p.r(26));
+        assemble(_p.r(19));
+        assemble(_p.r(20));
+        assemble(_p.r(13));
+        assemble(_p.r(14));
+        assemble(_p.r(16));
+        assemble(_p.r(23));
+        assemble(_p.r(18));
+        assemble(_p.r(21));
+        assemble(_p.r(24));
+        assemble(_p.r(25));
         return module.exports = KMEditor;
     }
 };
@@ -108,13 +113,776 @@ _p[4] = {
     }
 };
 
+//src/protocol/freemind.js
+_p[5] = {
+    value: function(require, exports, module) {
+        var data = window.kityminder.data;
+        var Promise = window.kityminder.Promise;
+        // 标签 map
+        var markerMap = {
+            "full-1": [ "priority", 1 ],
+            "full-2": [ "priority", 2 ],
+            "full-3": [ "priority", 3 ],
+            "full-4": [ "priority", 4 ],
+            "full-5": [ "priority", 5 ],
+            "full-6": [ "priority", 6 ],
+            "full-7": [ "priority", 7 ],
+            "full-8": [ "priority", 8 ]
+        };
+        function processTopic(topic, obj) {
+            //处理文本
+            obj.data = {
+                text: topic.TEXT
+            };
+            if (topic.richcontent) {
+                var _rich = Array.isArray(topic.richcontent) ? topic.richcontent : [ topic.richcontent ];
+                _rich.forEach(function(rich) {
+                    var div = document.createElement("div");
+                    $(div).html(rich.html);
+                    if (rich.type === "node") {
+                        obj.data.text = $.trim($(div).text());
+                    } else if (rich.type === "note") {
+                        obj.data.note = $.trim($(div).text());
+                    }
+                });
+            }
+            var i;
+            // 处理标签
+            if (topic.icon) {
+                var icons = topic.icon;
+                var type;
+                if (icons.length && icons.length > 0) {
+                    for (i in icons) {
+                        type = markerMap[icons[i].BUILTIN];
+                        if (type) obj.data[type[0]] = type[1];
+                    }
+                } else {
+                    type = markerMap[icons.BUILTIN];
+                    if (type) obj.data[type[0]] = type[1];
+                }
+            }
+            // 处理超链接
+            if (topic.LINK) {
+                obj.data.hyperlink = topic.LINK;
+            }
+            //处理子节点
+            if (topic.node) {
+                var tmp = topic.node;
+                if (tmp.length && tmp.length > 0) {
+                    //多个子节点
+                    obj.children = [];
+                    for (i in tmp) {
+                        obj.children.push({});
+                        processTopic(tmp[i], obj.children[i]);
+                    }
+                } else {
+                    //一个子节点
+                    obj.children = [ {} ];
+                    processTopic(tmp, obj.children[0]);
+                }
+            }
+        }
+        function xml2km(xml) {
+            var json = $.xml2json(xml);
+            var result = {};
+            processTopic(json.node, result);
+            return result;
+        }
+        data.registerProtocol("freemind", module.exports = {
+            fileDescription: "Freemind 格式",
+            fileExtension: ".mm",
+            dataType: "text",
+            decode: function(local) {
+                return new Promise(function(resolve, reject) {
+                    try {
+                        resolve(xml2km(local));
+                    } catch (e) {
+                        reject(new Error("XML 文件损坏！"));
+                    }
+                });
+            },
+            encode: function(json, km, options) {
+                // var url = 'minder-native-support/export.php'; // minder-native-support/export.php
+                // var data = JSON.stringify(json.root);
+                // function fetch() {
+                //     return new Promise(function(resolve, reject) {
+                //         var xhr = new XMLHttpRequest();
+                //         xhr.open('POST', url);
+                //         xhr.responseType = 'blob';
+                //         xhr.onload = resolve;
+                //         xhr.onerror = reject;
+                //         var form = new FormData();
+                //         form.append('type', 'freemind');
+                //         form.append('data', data);
+                //         xhr.send(form);
+                //     }).then(function(e) {
+                //         return e.target.response;
+                //     });
+                // }
+                // function download() {
+                //     var filename = options.filename || 'freemind.mm';
+                //     var form = document.createElement('form');
+                //     form.setAttribute('action', url);
+                //     form.setAttribute('method', 'POST');
+                //     form.appendChild(field('filename', filename));
+                //     form.appendChild(field('type', 'freemind'));
+                //     form.appendChild(field('data', data));
+                //     form.appendChild(field('download', '1'));
+                //     document.body.appendChild(form);
+                //     form.submit();
+                //     document.body.removeChild(form);
+                //     function field(name, content) {
+                //         var input = document.createElement('input');
+                //         input.type = 'hidden';
+                //         input.name = name;
+                //         input.value = content;
+                //         return input;
+                //     }
+                // }
+                return new Promise(function(resolve, reject) {
+                    var freemindTpl = _p.r(10);
+                    resolve(freemindTpl(json.root));
+                });
+            }
+        });
+    }
+};
+
+//src/protocol/markdown.js
+_p[6] = {
+    value: function(require, exports, module) {
+        var data = window.kityminder.data;
+        var LINE_ENDING_SPLITER = /\r\n|\r|\n/;
+        var EMPTY_LINE = "";
+        var NOTE_MARK_START = "\x3c!--Note--\x3e";
+        var NOTE_MARK_CLOSE = "\x3c!--/Note--\x3e";
+        function encode(json) {
+            return _build(json, 1).join("\n");
+        }
+        function _build(node, level) {
+            var lines = [];
+            level = level || 1;
+            var sharps = _generateHeaderSharp(level);
+            lines.push(sharps + " " + node.data.text);
+            lines.push(EMPTY_LINE);
+            var note = node.data.note;
+            if (note) {
+                var hasSharp = /^#/.test(note);
+                if (hasSharp) {
+                    lines.push(NOTE_MARK_START);
+                    note = note.replace(/^#+/gm, function($0) {
+                        return sharps + $0;
+                    });
+                }
+                lines.push(note);
+                if (hasSharp) {
+                    lines.push(NOTE_MARK_CLOSE);
+                }
+                lines.push(EMPTY_LINE);
+            }
+            if (node.children) node.children.forEach(function(child) {
+                lines = lines.concat(_build(child, level + 1));
+            });
+            return lines;
+        }
+        function _generateHeaderSharp(level) {
+            var sharps = "";
+            while (level--) sharps += "#";
+            return sharps;
+        }
+        function decode(markdown) {
+            var json, parentMap = {}, lines, line, lineInfo, level, node, parent, noteProgress, codeBlock;
+            // 一级标题转换 `{title}\n===` => `# {title}`
+            markdown = markdown.replace(/^(.+)\n={3,}/, function($0, $1) {
+                return "# " + $1;
+            });
+            lines = markdown.split(LINE_ENDING_SPLITER);
+            // 按行分析
+            for (var i = 0; i < lines.length; i++) {
+                line = lines[i];
+                lineInfo = _resolveLine(line);
+                // 备注标记处理
+                if (lineInfo.noteClose) {
+                    noteProgress = false;
+                    continue;
+                } else if (lineInfo.noteStart) {
+                    noteProgress = true;
+                    continue;
+                }
+                // 代码块处理
+                codeBlock = lineInfo.codeBlock ? !codeBlock : codeBlock;
+                // 备注条件：备注标签中，非标题定义，或标题越位
+                if (noteProgress || codeBlock || !lineInfo.level || lineInfo.level > level + 1) {
+                    if (node) _pushNote(node, line);
+                    continue;
+                }
+                // 标题处理
+                level = lineInfo.level;
+                node = _initNode(lineInfo.content, parentMap[level - 1]);
+                parentMap[level] = node;
+            }
+            _cleanUp(parentMap[1]);
+            return parentMap[1];
+        }
+        function _initNode(text, parent) {
+            var node = {
+                data: {
+                    text: text,
+                    note: ""
+                }
+            };
+            if (parent) {
+                if (parent.children) parent.children.push(node); else parent.children = [ node ];
+            }
+            return node;
+        }
+        function _pushNote(node, line) {
+            node.data.note += line + "\n";
+        }
+        function _isEmpty(line) {
+            return !/\S/.test(line);
+        }
+        function _resolveLine(line) {
+            var match = /^(#+)?\s*(.*)$/.exec(line);
+            return {
+                level: match[1] && match[1].length || null,
+                content: match[2],
+                noteStart: line == NOTE_MARK_START,
+                noteClose: line == NOTE_MARK_CLOSE,
+                codeBlock: /^\s*```/.test(line)
+            };
+        }
+        function _cleanUp(node) {
+            if (!/\S/.test(node.data.note)) {
+                node.data.note = null;
+                delete node.data.note;
+            } else {
+                var notes = node.data.note.split("\n");
+                while (notes.length && !/\S/.test(notes[0])) notes.shift();
+                while (notes.length && !/\S/.test(notes[notes.length - 1])) notes.pop();
+                node.data.note = notes.join("\n");
+            }
+            if (node.children) node.children.forEach(_cleanUp);
+        }
+        data.registerProtocol("markdown", module.exports = {
+            fileDescription: "Markdown 格式",
+            fileExtension: ".md",
+            mineType: "text/markdown",
+            dataType: "text",
+            decode: function(markdown) {
+                return decode(markdown);
+            },
+            encode: function(json) {
+                return encode(json.root);
+            }
+        });
+    }
+};
+
+//src/protocol/png.js
+_p[7] = {
+    value: function(require, exports, module) {
+        var data = window.kityminder.data;
+        var Promise = window.kityminder.Promise;
+        var DomURL = window.URL || window.webkitURL || window;
+        function loadImage(info, callback) {
+            return new Promise(function(resolve, reject) {
+                var image = document.createElement("img");
+                image.onload = function() {
+                    resolve({
+                        element: this,
+                        x: info.x,
+                        y: info.y,
+                        width: info.width,
+                        height: info.height
+                    });
+                };
+                image.onerror = function(err) {
+                    reject(err);
+                };
+                image.crossOrigin = "anonymous";
+                image.src = info.url;
+            });
+        }
+        function getSVGInfo(minder) {
+            var paper = minder.getPaper(), paperTransform, domContainer = paper.container, svgXml, svgContainer, svgDom, renderContainer = minder.getRenderContainer(), renderBox = renderContainer.getRenderBox(), width = renderBox.width + 1, height = renderBox.height + 1, blob, svgUrl, img;
+            // 保存原始变换，并且移动到合适的位置
+            paperTransform = paper.shapeNode.getAttribute("transform");
+            paper.shapeNode.setAttribute("transform", "translate(0.5, 0.5)");
+            renderContainer.translate(-renderBox.x, -renderBox.y);
+            // 获取当前的 XML 代码
+            svgXml = paper.container.innerHTML;
+            // 回复原始变换及位置
+            renderContainer.translate(renderBox.x, renderBox.y);
+            paper.shapeNode.setAttribute("transform", paperTransform);
+            // 过滤内容
+            svgContainer = document.createElement("div");
+            svgContainer.innerHTML = svgXml;
+            svgDom = svgContainer.querySelector("svg");
+            Array.prototype.forEach.call(svgDom.querySelectorAll("image"), function(img) {
+                img.remove();
+            });
+            svgDom.setAttribute("width", renderBox.width + 1);
+            svgDom.setAttribute("height", renderBox.height + 1);
+            svgDom.setAttribute("style", 'font-family: Arial, "Microsoft Yahei","Heiti SC";');
+            svgContainer = document.createElement("div");
+            svgContainer.appendChild(svgDom);
+            svgXml = svgContainer.innerHTML;
+            // Dummy IE
+            svgXml = svgXml.replace(' xmlns="http://www.w3.org/2000/svg" ' + 'xmlns:NS1="" NS1:ns1:xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:NS2="" NS2:xmlns:ns1=""', "");
+            // svg 含有 &nbsp; 符号导出报错 Entity 'nbsp' not defined
+            svgXml = svgXml.replace(/&nbsp;/g, "&#xa0;");
+            blob = new Blob([ svgXml ], {
+                type: "image/svg+xml"
+            });
+            svgUrl = DomURL.createObjectURL(blob);
+            //svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgXml);
+            var allNodes = minder.getAllNode();
+            var imagesInfo = [];
+            for (var i = 0; i < allNodes.length; i++) {
+                var nodeData = allNodes[i].data;
+                if (nodeData.image) {
+                    /*
+                * 导出之前渲染这个节点，否则取出的 contentBox 不对
+                * by zhangbobell
+                * */
+                    minder.renderNode(allNodes[i]);
+                    var imageUrl = nodeData.image;
+                    var imageSize = nodeData.imageSize;
+                    var imageRenderBox = allNodes[i].getRenderBox("ImageRenderer", minder.getRenderContainer());
+                    var imageInfo = {
+                        url: imageUrl,
+                        width: imageSize.width,
+                        height: imageSize.height,
+                        x: -renderContainer.getBoundaryBox().x + imageRenderBox.x,
+                        // 这个地方之前还加了 20
+                        y: -renderContainer.getBoundaryBox().y + imageRenderBox.y
+                    };
+                    imagesInfo.push(imageInfo);
+                }
+            }
+            return {
+                width: width,
+                height: height,
+                dataUrl: svgUrl,
+                xml: svgXml,
+                imagesInfo: imagesInfo
+            };
+        }
+        function encode(json, minder, option) {
+            var resultCallback;
+            var Promise = kityminder.Promise;
+            /* 绘制 PNG 的画布及上下文 */
+            var canvas = document.createElement("canvas");
+            var ctx = canvas.getContext("2d");
+            /* 尝试获取背景图片 URL 或背景颜色 */
+            var bgDeclare = minder.getStyle("background").toString();
+            var bgUrl = /url\(\"(.+)\"\)/.exec(bgDeclare);
+            var bgColor = kity.Color.parse(bgDeclare);
+            /* 获取 SVG 文件内容 */
+            var svgInfo = getSVGInfo(minder);
+            var width = option && option.width && option.width > svgInfo.width ? option.width : svgInfo.width;
+            var height = option && option.height && option.height > svgInfo.height ? option.height : svgInfo.height;
+            var offsetX = option && option.width && option.width > svgInfo.width ? (option.width - svgInfo.width) / 2 : 0;
+            var offsetY = option && option.height && option.height > svgInfo.height ? (option.height - svgInfo.height) / 2 : 0;
+            var svgDataUrl = svgInfo.dataUrl;
+            var imagesInfo = svgInfo.imagesInfo;
+            /* 画布的填充大小 */
+            var padding = 20;
+            canvas.width = width + padding * 2;
+            canvas.height = height + padding * 2;
+            function fillBackground(ctx, style) {
+                ctx.save();
+                ctx.fillStyle = style;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            }
+            function drawImage(ctx, image, x, y, width, height) {
+                if (width && height) {
+                    ctx.drawImage(image, x + padding, y + padding, width, height);
+                } else {
+                    ctx.drawImage(image, x + padding, y + padding);
+                }
+            }
+            function generateDataUrl(canvas) {
+                return canvas.toDataURL("image/png");
+            }
+            // 加载节点上的图片
+            function loadImages(imagesInfo) {
+                var imagePromises = imagesInfo.map(function(imageInfo) {
+                    return loadImage(imageInfo);
+                });
+                return Promise.all(imagePromises);
+            }
+            function drawSVG() {
+                var svgData = {
+                    url: svgDataUrl
+                };
+                return loadImage(svgData).then(function($image) {
+                    drawImage(ctx, $image.element, offsetX, offsetY, $image.width, $image.height);
+                    return loadImages(imagesInfo);
+                }).then(function($images) {
+                    for (var i = 0; i < $images.length; i++) {
+                        var $image = $images[i];
+                        // if (/^data\:/.test($image.element.src)) continue;
+                        drawImage(ctx, $image.element, $image.x + offsetX, $image.y + offsetY, $image.width, $image.height);
+                    }
+                    DomURL.revokeObjectURL(svgDataUrl);
+                    return generateDataUrl(canvas);
+                }, function(err) {
+                    // 这里处理 reject，出错基本上是因为跨域，
+                    // 出错后依然导出，只不过没有图片。
+                    // alert('脑图的节点中包含跨域图片，导出的 png 中节点图片不显示，你可以替换掉这些跨域的图片并重试。');
+                    DomURL.revokeObjectURL(svgDataUrl);
+                    return generateDataUrl(canvas);
+                });
+            }
+            if (bgUrl) {
+                var bgInfo = {
+                    url: bgUrl[1]
+                };
+                return loadImage(bgInfo).then(function($image) {
+                    fillBackground(ctx, ctx.createPattern($image.element, "repeat"));
+                    return drawSVG();
+                });
+            } else {
+                fillBackground(ctx, bgColor.toString());
+                return drawSVG();
+            }
+        }
+        data.registerProtocol("png", module.exports = {
+            fileDescription: "PNG 图片",
+            fileExtension: ".png",
+            mineType: "image/png",
+            dataType: "base64",
+            encode: encode
+        });
+    }
+};
+
+//src/protocol/svg.js
+_p[8] = {
+    value: function(require, exports, module) {
+        var data = window.kityminder.data;
+        data.registerProtocol("svg", module.exports = {
+            fileDescription: "SVG 矢量图",
+            fileExtension: ".svg",
+            mineType: "image/svg+xml",
+            dataType: "text",
+            encode: function(json, minder) {
+                var paper = minder.getPaper(), paperTransform = paper.shapeNode.getAttribute("transform"), svgXml, $svg, renderContainer = minder.getRenderContainer(), renderBox = renderContainer.getRenderBox(), transform = renderContainer.getTransform(), width = renderBox.width, height = renderBox.height, padding = 20;
+                paper.shapeNode.setAttribute("transform", "translate(0.5, 0.5)");
+                svgXml = paper.container.innerHTML;
+                paper.shapeNode.setAttribute("transform", paperTransform);
+                $svg = $(svgXml).filter("svg");
+                $svg.attr({
+                    width: width + padding * 2 | 0,
+                    height: height + padding * 2 | 0,
+                    style: 'font-family: Arial, "Microsoft Yahei",  "Heiti SC"; background: ' + minder.getStyle("background")
+                });
+                $svg[0].setAttribute("viewBox", [ renderBox.x - padding | 0, renderBox.y - padding | 0, width + padding * 2 | 0, height + padding * 2 | 0 ].join(" "));
+                // need a xml with width and height
+                svgXml = $("<div></div>").append($svg).html();
+                svgXml = $("<div></div>").append($svg).html();
+                // svg 含有 &nbsp; 符号导出报错 Entity 'nbsp' not defined
+                svgXml = svgXml.replace(/&nbsp;/g, "&#xa0;");
+                // svg 含有 &nbsp; 符号导出报错 Entity 'nbsp' not defined
+                return svgXml;
+            }
+        });
+    }
+};
+
+//src/protocol/tpl.js
+_p[9] = {
+    value: function(require, exports, module) {
+        var interpolate = function(text, scope) {
+            var fn = new Function("scope", "return scope." + text + ";");
+            return fn.call(this, scope);
+        };
+        var format = function(template, args) {
+            var text = String(template);
+            return text.replace(/\{\{=([\s\S]+?)\}\}/g, function(match, _interpolate) {
+                return interpolate(_interpolate, args);
+            });
+        };
+        return module.exports = format;
+    }
+};
+
+//src/protocol/tpl_freemind.js
+_p[10] = {
+    value: function(require, exports, module) {
+        var tpl = _p.r(9);
+        var freemindTpl = '<map version="1.0.1">\n' + "\x3c!-- To view this file, download free mind mapping software FreeMind from http://freemind.sourceforge.net --\x3e\n" + "{{=freemindContent}}\n" + "</map>";
+        var topicTpl = '\n<node CREATED="{{=data.created}}" ID="ID_{{=data.id}}" MODIFIED="{{=data.created}}" ' + 'TEXT="{{=data.text}}" POSITION="{{=data.position}}" {{=link}}>' + "{{=childrenContent}}" + "{{=priorityContent}}" + "{{=imageContent}}" + "{{=noteContent}}" + "</node>\n";
+        var noteTpl = '<richcontent TYPE="NOTE">' + "<html>" + "<head>" + "</head>" + "<body>" + "<p>{{=note}}</p>" + "</body>" + "</html>" + "</richcontent>";
+        var priorityTpl = '<icon BUILTIN="full-{{=data.priority}}"/>';
+        var imageTpl = '<richcontent TYPE="NODE">' + "<html>" + "<head>" + "</head>" + "<body>" + '<img src="{{=data.image}}" width="{{=data.imageSize.width}}" height="{{=data.imageSize.height}}"/>' + "</body>" + "</html>" + "</richcontent>";
+        return module.exports = function(_node) {
+            // 这个地方必须写return ,不然会报错，操。
+            var template = "";
+            var _position = [ "right", "left" ];
+            var _id = 1;
+            var _created = 1;
+            var format = function(node, position) {
+                var pt = "", it = "", ct = "", tt = "", nt = "", link = "";
+                // pt = priorityTpl, it = imageTpl, ct = childrenTpl, t = topicTpl, nt = noteTpl
+                if (node.data.priority) {
+                    pt = tpl(priorityTpl, node);
+                }
+                if (node.data.image && !/^data\:/.test(node.data.image)) {
+                    it = tpl(imageTpl, node);
+                }
+                if (node.data.note) {
+                    nt = tpl(noteTpl, {
+                        note: node.data.note
+                    });
+                }
+                if (node.data.hyperlink) {
+                    link = 'LINK="' + node.data.hyperlink + '"';
+                }
+                if (node.children && node.children.length) {
+                    node.children.forEach(function(child, index) {
+                        ct += format(child, _position[index % 2]);
+                    });
+                }
+                var text = node.data.text ? node.data.text : "";
+                text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+                tt = tpl(topicTpl, {
+                    data: {
+                        created: _created++,
+                        id: _id++,
+                        text: text,
+                        position: position ? position : ""
+                    },
+                    childrenContent: ct,
+                    priorityContent: pt,
+                    imageContent: it,
+                    noteContent: nt,
+                    link: link
+                });
+                return tt + "\n";
+            };
+            var tp = format(_node);
+            return tpl(freemindTpl, {
+                freemindContent: tp
+            });
+        };
+    }
+};
+
+//src/protocol/tpl_xmind.js
+_p[11] = {
+    value: function(require, exports, module) {
+        var tpl = _p.r(9);
+        var xmindTpl = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>' + '<xmap-content xmlns="urn:xmind:xmap:xmlns:content:2.0" xmlns:fo="http://www.w3.org/1999/XSL/Format" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:xlink="http://www.w3.org/1999/xlink" timestamp="1407310121003" version="2.0">' + '<sheet id="{{=id}}" timestamp="{{=timestamp}}">' + "{{=topic}}" + "<title>画布 1</title>" + "</sheet>" + "</xmap-content>";
+        var revTpl = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>' + '<xmap-revision-content xmlns="urn:xmind:xmap:xmlns:revision:1.0" xmlns:fo="http://www.w3.org/1999/XSL/Format"' + 'xmlns:svg="http://www.w3.org/2000/svg" xmlns:xhtml="http://www.w3.org/1999/xhtml"' + 'xmlns:xlink="http://www.w3.org/1999/xlink">' + '<sheet id="{{=id}}" timestamp="{{=timestamp}}" xmlns="urn:xmind:xmap:xmlns:content:2.0">' + "{{=topic}}" + "<title>画布 1</title>" + "</sheet>" + "</xmap-revision-content>";
+        var metaTpl = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>' + '<meta xmlns="urn:xmind:xmap:xmlns:meta:2.0" version="2.0">' + "<Creator>" + "<Name>XMind</Name>" + "<Version>3.4.1.201401221918</Version>" + "</Creator>" + "<Thumbnail>" + "<Origin>" + "<X>209</X>" + "<Y>113</Y>" + "</Origin>" + "<BackgroundColor>#F3F4F9</BackgroundColor>" + "</Thumbnail>" + "</meta>";
+        var revisionsTpl = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>' + '<xmap-revisions media-type="application/vnd.xmind.sheet" next-rev-num="2" resource-id="{{=id}}">' + '<revision creator-name="XMind" creator-version="3.4.1.201401221918"' + 'resource="Revisions/{{=id}}/rev-1-{{=timestamp}}.xml" rev-num="1"' + ' timestamp="{{=timestamp}}"/>' + "</xmap-revisions>";
+        var manifestTpl = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>' + '<manifest xmlns="urn:xmind:xmap:xmlns:manifest:1.0">' + '<file-entry full-path="content.xml" media-type="text/xml"/>' + '<file-entry full-path="META-INF/" media-type=""/>' + '<file-entry full-path="META-INF/manifest.xml" media-type="text/xml"/>' + '<file-entry full-path="meta.xml" media-type="text/xml"/>' + '<file-entry full-path="Revisions/" media-type=""/>' + '<file-entry full-path="Revisions/{{=id}}/" media-type=""/>' + '<file-entry full-path="Revisions/{{=id}}/rev-1-{{=timestamp}}.xml" media-type=""/>' + '<file-entry full-path="Revisions/{{=id}}/revisions.xml" media-type=""/>' + '<file-entry full-path="Thumbnails/" media-type=""/>' + '<file-entry full-path="Thumbnails/thumbnail.png" media-type="image/png"/>' + "</manifest>";
+        var topicTpl = '<topic id="{{=data.id}}" structure-class="org.xmind.ui.map.clockwise" timestamp="{{=data.timestamp}}" {{=xlink}}>' + "<title>{{=data.text}}</title>" + "{{=markerRef}}" + "{{=image}}" + "{{=children}}" + "{{=notes}}" + "</topic>";
+        var notesTpl = "<notes><plain>{{=note}}</plain></notes>";
+        var markerRef = "<marker-refs>" + "{{=markerId}}" + "</marker-refs>";
+        var markerId = '<marker-ref marker-id="{{=markerId}}"/>';
+        var imageTpl = '<xhtml:img svg:height="{{=data.imageSize.height}}" svg:width="{{=data.imageSize.width}}" xhtml:src="xap:{{=data.image}}"/>';
+        var childrenTpl = "<children>" + '<topics type="attached">' + "{{=topic}}" + "</topics>" + "</children>";
+        var xlinkTpl = 'xlink:href="{{=link}}"';
+        var progressList = [ "task-start", "task-oct", "task-quarter", "task-3oct", "task-half", "task-5oct", "task-3quar", "task-7oct", "task-done" ];
+        var getTimeAndId = function() {
+            var time = new Date().getTime();
+            return {
+                timestamp: time,
+                id: $.md5(time)
+            };
+        };
+        return module.exports = function(_node) {
+            var template = "";
+            var format = function(node) {
+                var mt = "", it = "", ct = "", tt = "", xlt = "", nt = "";
+                // pt = markerTpl, it = imageTpl, ct = childrenTpl, t = topicTpl, xlt = xlinkTpl, nt = noteTpl
+                var mdt = "";
+                // mdt = markerIdTpc
+                var data = node.data;
+                if (data.progress) {
+                    mdt += tpl(markerId, {
+                        markerId: progressList[data.progress - 1]
+                    });
+                }
+                if (data.priority) {
+                    mdt += tpl(markerId, {
+                        markerId: "priority-" + data.priority
+                    });
+                }
+                if (mdt) mt = tpl(markerRef, {
+                    markerId: mdt
+                });
+                if (data.image && !/^data\:/.test(data.image)) {
+                    it = tpl(imageTpl, node);
+                }
+                if (data.hyperlink) {
+                    xlt = tpl(xlinkTpl, {
+                        link: data.hyperlink
+                    });
+                }
+                if (data.note) {
+                    nt = tpl(notesTpl, {
+                        note: data.note
+                    });
+                }
+                if (node.children && node.children.length) {
+                    var _ct = "";
+                    node.children.forEach(function(child) {
+                        _ct += format(child);
+                    });
+                    ct = tpl(childrenTpl, {
+                        topic: _ct
+                    });
+                }
+                var text = node.data.text ? node.data.text : "";
+                text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+                var meta = getTimeAndId();
+                tt = tpl(topicTpl, {
+                    data: {
+                        timestamp: meta.timestamp,
+                        id: meta.id,
+                        text: text
+                    },
+                    markerRef: mt,
+                    children: ct,
+                    image: it,
+                    xlink: xlt,
+                    notes: nt
+                });
+                return tt + "\n";
+            };
+            var tp = format(_node);
+            var meta = getTimeAndId();
+            var contentXml = tpl(xmindTpl, {
+                topic: tp,
+                id: meta.id,
+                timestamp: meta.timestamp
+            });
+            var metaXml = tpl(metaTpl);
+            var revisionsData = getTimeAndId();
+            var revisionsXml = tpl(revisionsTpl, {
+                id: meta.id,
+                timestamp: revisionsData.timestamp
+            });
+            var revXml = tpl(revTpl, {
+                topic: tp,
+                id: meta.id,
+                timestamp: meta.timestamp
+            });
+            var manifestXml = tpl(manifestTpl, {
+                id: meta.id,
+                timestamp: revisionsData.timestamp
+            });
+            return {
+                contentXml: contentXml,
+                metaXml: metaXml,
+                manifestXml: manifestXml,
+                meta: meta,
+                revXml: revXml,
+                revisionsXml: revisionsXml
+            };
+        };
+    }
+};
+
+//src/protocol/xmind.js
+_p[12] = {
+    value: function(require, exports, module) {
+        var data = window.kityminder.data;
+        var Promise = window.kityminder.Promise;
+        var progressList = [ "task-start", "task-oct", "task-quarter", "task-3oct", "task-half", "task-5oct", "task-3quar", "task-7oct", "task-done" ];
+        function processTopic(topic, obj) {
+            obj.data = {
+                text: topic.title
+            };
+            if (topic["xlink:href"]) {
+                obj.data.hyperlink = topic["xlink:href"];
+                obj.data.hyperlinkTitle = "";
+            }
+            if (topic.notes && topic.notes.plain) {
+                obj.data.note = topic.notes.plain;
+            }
+            if (topic.marker_refs && topic.marker_refs.marker_ref && topic.marker_refs.marker_ref.marker_id) {
+                var marker_id = topic.marker_refs.marker_ref.marker_id;
+                if (marker_id.indexOf("priority") === 0) {
+                    obj.data.priority = parseInt(marker_id.match(/\d+/)[0], 10);
+                }
+                if (progressList.indexOf(marker_id) >= 0) {
+                    obj.data.progress = progressList.indexOf(marker_id) + 1;
+                }
+            }
+            if (topic.children && topic.children.topics) {
+                var topics = topic.children.topics;
+                if (!Array.isArray(topics)) topics = [ topics ];
+                topics.forEach(function(wrap) {
+                    if (wrap.type === "attached") {
+                        if (!obj.children) obj.children = [];
+                        var children = Array.isArray(wrap.topic) ? wrap.topic : [ wrap.topic ];
+                        for (i in children) {
+                            if (children[i]) {
+                                obj.children.push({});
+                                processTopic(children[i], obj.children[i]);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        function xml2km(xml) {
+            var json = $.xml2json(xml);
+            var result = {};
+            processTopic(json.sheet.topic, result);
+            return result;
+        }
+        data.registerProtocol("xmind", module.exports = {
+            fileDescription: "xmind 格式",
+            fileExtension: ".xmind",
+            dataType: "text",
+            decode: function(local) {
+                return new Promise(function(resolve, reject) {
+                    try {
+                        resolve(xml2km(local));
+                    } catch (e) {
+                        reject(new Error("XML 文件损坏！"));
+                    }
+                });
+            },
+            encode: function(json, km, options) {
+                return new Promise(function(resolve, reject) {
+                    var xmindTpl = _p.r(11);
+                    var data = xmindTpl(json.root);
+                    // 生成 zip 文件
+                    var zip = new JSZip();
+                    zip.file("content.xml", data.contentXml);
+                    zip.file("meta.xml", data.metaXml);
+                    var metaInfoFolder = zip.folder("META-INF");
+                    metaInfoFolder.file("manifest.xml", data.manifestXml);
+                    var revisionsFolder = zip.folder("Revisions").folder(data.meta.id);
+                    revisionsFolder.file("rev-1-" + data.meta.timestamp + ".xml", data.revXml);
+                    revisionsFolder.file("revisions.xml", data.revisionsXml);
+                    zip.generateAsync({
+                        type: "blob"
+                    }).then(function(content) {
+                        resolve(content);
+                    });
+                });
+            }
+        });
+    }
+};
+
 //src/runtime/clipboard-mimetype.js
 /**
  * @Desc: 新增一个用于处理系统ctrl+c ctrl+v等方式导入导出节点的MIMETYPE处理，如系统不支持clipboardEvent或者是FF则不初始化改class
  * @Editor: Naixor
  * @Date: 2015.9.21
  */
-_p[5] = {
+_p[13] = {
     value: function(require, exports, module) {
         function MimeType() {
             /**
@@ -229,7 +997,7 @@ _p[5] = {
  * @Editor: Naixor
  * @Date: 2015.9.21
  */
-_p[6] = {
+_p[14] = {
     value: function(require, exports, module) {
         function ClipboardRuntime() {
             var minder = this.minder;
@@ -410,7 +1178,7 @@ _p[6] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[7] = {
+_p[15] = {
     value: function(require, exports, module) {
         /**
      * 最先执行的 Runtime，初始化编辑器容器
@@ -441,10 +1209,10 @@ _p[7] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[8] = {
+_p[16] = {
     value: function(require, exports, module) {
         var Hotbox = _p.r(2);
-        var Debug = _p.r(19);
+        var Debug = _p.r(27);
         var debug = new Debug("drag");
         function DragRuntime() {
             var fsm = this.fsm;
@@ -576,9 +1344,9 @@ _p[8] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[9] = {
+_p[17] = {
     value: function(require, exports, module) {
-        var Debug = _p.r(19);
+        var Debug = _p.r(27);
         var debug = new Debug("fsm");
         function handlerConditionMatch(condition, when, exit, enter) {
             if (condition.when != when) return false;
@@ -684,9 +1452,9 @@ _p[9] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[10] = {
+_p[18] = {
     value: function(require, exports, module) {
-        var jsonDiff = _p.r(22);
+        var jsonDiff = _p.r(30);
         function HistoryRuntime() {
             var minder = this.minder;
             var hotbox = this.hotbox;
@@ -804,7 +1572,7 @@ _p[10] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[11] = {
+_p[19] = {
     value: function(require, exports, module) {
         var Hotbox = _p.r(2);
         function HotboxRuntime() {
@@ -856,10 +1624,10 @@ _p[11] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[12] = {
+_p[20] = {
     value: function(require, exports, module) {
-        _p.r(21);
-        var Debug = _p.r(19);
+        _p.r(29);
+        var Debug = _p.r(27);
         var debug = new Debug("input");
         function InputRuntime() {
             var fsm = this.fsm;
@@ -1220,7 +1988,7 @@ _p[12] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[13] = {
+_p[21] = {
     value: function(require, exports, module) {
         var Hotbox = _p.r(2);
         // Nice: http://unixpapa.com/js/key.html
@@ -1383,7 +2151,7 @@ _p[13] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[14] = {
+_p[22] = {
     value: function(require, exports, module) {
         var Minder = _p.r(4);
         function MinderRuntime() {
@@ -1405,7 +2173,7 @@ _p[14] = {
 };
 
 //src/runtime/node.js
-_p[15] = {
+_p[23] = {
     value: function(require, exports, module) {
         function NodeRuntime() {
             var runtime = this;
@@ -1480,7 +2248,7 @@ _p[15] = {
 };
 
 //src/runtime/priority.js
-_p[16] = {
+_p[24] = {
     value: function(require, exports, module) {
         function PriorityRuntime() {
             var minder = this.minder;
@@ -1526,7 +2294,7 @@ _p[16] = {
 };
 
 //src/runtime/progress.js
-_p[17] = {
+_p[25] = {
     value: function(require, exports, module) {
         function ProgressRuntime() {
             var minder = this.minder;
@@ -1580,9 +2348,9 @@ _p[17] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[18] = {
+_p[26] = {
     value: function(require, exports, module) {
-        var key = _p.r(23);
+        var key = _p.r(31);
         var hotbox = _p.r(2);
         function ReceiverRuntime() {
             var fsm = this.fsm;
@@ -1715,9 +2483,9 @@ _p[18] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[19] = {
+_p[27] = {
     value: function(require, exports, module) {
-        var format = _p.r(20);
+        var format = _p.r(28);
         function noop() {}
         function stringHash(str) {
             var hash = 0;
@@ -1746,7 +2514,7 @@ _p[19] = {
 };
 
 //src/tool/format.js
-_p[20] = {
+_p[28] = {
     value: function(require, exports, module) {
         function format(template, args) {
             if (typeof args != "object") {
@@ -1769,7 +2537,7 @@ _p[20] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[21] = {
+_p[29] = {
     value: function(require, exports, module) {
         if (!("innerText" in document.createElement("a")) && "getSelection" in window) {
             HTMLElement.prototype.__defineGetter__("innerText", function() {
@@ -1816,7 +2584,7 @@ _p[21] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[22] = {
+_p[30] = {
     value: function(require, exports, module) {
         /*!
     * https://github.com/Starcounter-Jack/Fast-JSON-Patch
@@ -1902,9 +2670,9 @@ _p[22] = {
 };
 
 //src/tool/key.js
-_p[23] = {
+_p[31] = {
     value: function(require, exports, module) {
-        var keymap = _p.r(24);
+        var keymap = _p.r(32);
         var CTRL_MASK = 4096;
         var ALT_MASK = 8192;
         var SHIFT_MASK = 16384;
@@ -1973,7 +2741,7 @@ _p[23] = {
 };
 
 //src/tool/keymap.js
-_p[24] = {
+_p[32] = {
     value: function(require, exports, module) {
         var keymap = {
             Shift: 16,

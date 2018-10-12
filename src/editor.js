@@ -1,5 +1,11 @@
 define(function(require, exports, module) {
 
+    require('./protocol/png');
+    require('./protocol/freemind');
+    require('./protocol/xmind');
+    require('./protocol/markdown');
+    require('./protocol/svg');
+
     /**
      * 运行时
      */
