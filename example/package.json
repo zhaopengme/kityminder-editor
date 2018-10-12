@@ -1,0 +1,19 @@
+{
+  "name": "kityminder",
+  "version": "1.0.0",
+  "description": "Mindmap For GitNote",
+  "homepage": "https://gitnoteapp.com",
+  "keywords": [
+    "minder",
+    "mindermap"
+  ],
+  "author": {
+    "name": "user.zhaopeng@gmail.com",
+    "url": "https://zhaopeng.me"
+  },
+  "main": "index.plugin.html",
+  "directories": {
+    "lib": "lib"
+  },
+  "license": "MIT"
+}
